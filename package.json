@@ -1,0 +1,19 @@
+{
+  "name": "blockchain-adoption-ml",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "prepare-test-data": "node scripts/createTestData.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "mathjs": "^14.4.0",
+    "papaparse": "^5.5.2"
+  }
+}
