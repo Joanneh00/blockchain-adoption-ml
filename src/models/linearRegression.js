@@ -1,3 +1,10 @@
+const { 
+  createSeededRandom
+} = require('../utils/dataLoader');
+
+const MASTER_SEED = 10;
+const seededRandom = createSeededRandom(MASTER_SEED);
+
 class LinearRegression {
     constructor() {
       this.weights = null;
@@ -9,7 +16,7 @@ class LinearRegression {
       const numFeatures = features[0].length;
       
       // 初始化权重和偏置
-      this.weights = Array(numFeatures).fill(0).map(() => Math.random() * 0.1);
+      this.weights = Array(numFeatures).fill(0).map(() => seededRandom() * 0.1);
       this.bias = 0;
       
       // 梯度下降优化

@@ -1,3 +1,10 @@
+const { 
+  createSeededRandom
+} = require('../utils/dataLoader');
+
+const MASTER_SEED = 10;
+const seededRandom = createSeededRandom(MASTER_SEED);
+
 class RandomForestRegressor {
     constructor(numTrees = 10, maxDepth = 5, minSamplesPerTree = 0.8, featureSubsetRatio = 0.7) {
       this.numTrees = numTrees;
@@ -14,7 +21,7 @@ class RandomForestRegressor {
       const sampleIndices = [];
       
       for (let i = 0; i < sampleSize; i++) {
-        const randomIndex = Math.floor(Math.random() * n);
+        const randomIndex = Math.floor(seededRandom() * n);
         sampleIndices.push(randomIndex);
       }
       
@@ -31,7 +38,7 @@ class RandomForestRegressor {
       
       // Shuffle array
       for (let i = indices.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
+        const j = Math.floor(seededRandom() * (i + 1));
         [indices[i], indices[j]] = [indices[j], indices[i]];
       }
       

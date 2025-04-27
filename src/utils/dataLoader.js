@@ -2,6 +2,9 @@ const fs = require('fs');
 const path = require('path');
 const Papa = require('papaparse');
 
+const MASTER_SEED = 100;
+const seededRandom = createSeededRandom(MASTER_SEED);
+
 // 构念定义
 const constructDefinitions = {
   CPT: ['CPT1', 'CPT2', 'CPT3', 'CPT4'], // Compatibility
@@ -99,7 +102,7 @@ function trainTestSplit(features, target, testSize = 0.2) {
   // 创建索引数组并打乱
   const indices = Array.from({ length: totalSamples }, (_, i) => i);
   for (let i = indices.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(seededRandom() * (i + 1));
     [indices[i], indices[j]] = [indices[j], indices[i]];
   }
   
@@ -114,11 +117,20 @@ function trainTestSplit(features, target, testSize = 0.2) {
   };
 }
 
+function createSeededRandom(seed) {
+  let state = seed;
+  return function() {
+    state = (state * 9301 + 49297) % 233280;
+    return state / 233280;
+  };
+}
+
 module.exports = {
   loadData,
   calculateCompositeScores,
   prepareMLDataset,
   extractFeaturesAndTarget,
   trainTestSplit,
-  constructDefinitions
+  constructDefinitions,
+  createSeededRandom
 };

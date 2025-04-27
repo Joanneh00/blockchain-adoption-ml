@@ -2,6 +2,7 @@ class DecisionTreeRegressor {
     constructor(maxDepth = 5) {
       this.maxDepth = maxDepth;
       this.tree = null;
+      // this.random = seededRandom;
     }
     
     findBestSplit(features, target) {

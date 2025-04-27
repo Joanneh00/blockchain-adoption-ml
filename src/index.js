@@ -4,7 +4,8 @@ const {
   calculateCompositeScores, 
   prepareMLDataset,
   extractFeaturesAndTarget,
-  trainTestSplit
+  trainTestSplit,
+  createSeededRandom
 } = require('./utils/dataLoader');
 const LinearRegression = require('./models/linearRegression');
 const DecisionTreeRegressor = require('./models/decisionTree');
