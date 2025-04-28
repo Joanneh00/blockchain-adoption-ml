@@ -41,13 +41,100 @@ async function main() {
     console.log(`Training set size: ${primarySplit.trainFeatures.length}`);
     console.log(`Test set size: ${primarySplit.testFeatures.length}`);
     
+        /*-------------------------------------------------
+      MODEL TUNING WITH CROSS VALIDATION
+    -------------------------------------------------*/
+    console.log("\n----- MODEL TUNING WITH CROSS VALIDATION -----");
+
+    // 交叉验证函数
+    function crossValidate(features, target, folds, modelBuilderFn) {
+      const n = features.length;
+      const foldSize = Math.floor(n / folds);
+      const scores = [];
+
+      for (let i = 0; i < folds; i++) {
+        // 创建验证集索引
+        const validationIndices = [];
+        for (let j = 0; j < foldSize; j++) {
+          validationIndices.push((i * foldSize + j) % n);
+        }
+        
+        // 创建训练集索引(所有不在验证集中的索引)
+        const trainIndices = [];
+        for (let j = 0; j < n; j++) {
+          if (!validationIndices.includes(j)) {
+            trainIndices.push(j);
+          }
+        }
+        
+        // 提取训练和验证数据
+        const trainFeatures = trainIndices.map(idx => features[idx]);
+        const trainTarget = trainIndices.map(idx => target[idx]);
+        const validFeatures = validationIndices.map(idx => features[idx]);
+        const validTarget = validationIndices.map(idx => target[idx]);
+        
+        // 构建并训练模型
+        const model = modelBuilderFn();
+        model.train(trainFeatures, trainTarget);
+        
+        // 评估模型
+        const score = model.score(validFeatures, validTarget);
+        scores.push(score);
+      }
+      
+      // 返回所有折的分数
+      return scores;
+    }
+
+    // 线性回归模型微调
+    console.log("Tuning Linear Regression Model...");
+    const learningRates = [0.0001, 0.001, 0.01];
+    const iterations = [500, 1000];
+    let bestLrParams = null;
+    let bestLrScore = -Infinity;
+
+    for (const lr of learningRates) {
+      for (const iter of iterations) {
+        // 对当前参数组合进行5折交叉验证
+        const scores = crossValidate(
+          primaryModel.features, 
+          primaryModel.target, 
+          5, 
+          () => {
+            const model = new LinearRegression();
+            model.learningRate = lr;
+            model.iterations = iter;
+            return model;
+          }
+        );
+        
+        // 计算平均分数
+        const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+        const stdDev = Math.sqrt(
+          scores.reduce((sum, s) => sum + Math.pow(s - avgScore, 2), 0) / scores.length
+        );
+        
+        console.log(`  LR: ${lr}, Iterations: ${iter}, Avg R²: ${avgScore.toFixed(4)}, StdDev: ${stdDev.toFixed(4)}`);
+        
+        // 更新最佳参数
+        if (avgScore > bestLrScore) {
+          bestLrScore = avgScore;
+          bestLrParams = { learningRate: lr, iterations: iter };
+        }
+      }
+    }
+
+    console.log(`\nBest Linear Regression Parameters: Learning Rate = ${bestLrParams.learningRate}, Iterations = ${bestLrParams.iterations}`);
+    console.log(`Best Cross-Validation R²: ${bestLrScore.toFixed(4)}`);
+
+
     /*-------------------------------------------------
       MODEL 1: LINEAR REGRESSION ANALYSIS 
     -------------------------------------------------*/
     console.log("\n----- LINEAR REGRESSION MODEL -----");
     // Train and evaluate the linear regression model
     const lr = new LinearRegression();
-    lr.train(primarySplit.trainFeatures, primarySplit.trainTarget);
+    lr.train(primarySplit.trainFeatures, primarySplit.trainTarget, bestLrParams.learningRate, bestLrParams.iterations);
     
     const lrTrainScore = lr.score(primarySplit.trainFeatures, primarySplit.trainTarget);
     const lrTestScore = lr.score(primarySplit.testFeatures, primarySplit.testTarget);
