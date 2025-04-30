@@ -127,6 +127,80 @@ async function main() {
     console.log(`\nBest Linear Regression Parameters: Learning Rate = ${bestLrParams.learningRate}, Iterations = ${bestLrParams.iterations}`);
     console.log(`Best Cross-Validation R²: ${bestLrScore.toFixed(4)}`);
 
+    // Fine Tune Decision Tree
+    console.log("\nTuning Decision Tree Model...");
+    const maxDepths = [2, 3, 4, 5];
+    let bestDtParams = null;
+    let bestDtScore = -Infinity;
+
+    for (const depth of maxDepths) {
+      // 对当前参数进行5折交叉验证
+      const scores = crossValidate(
+        primaryModel.features, 
+        primaryModel.target, 
+        5, 
+        () => {
+          const model = new DecisionTreeRegressor(depth);
+          return model;
+        }
+      );
+      
+      // 计算平均分数
+      const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+      const stdDev = Math.sqrt(
+        scores.reduce((sum, s) => sum + Math.pow(s - avgScore, 2), 0) / scores.length
+      );
+      
+      console.log(`  Max Depth: ${depth}, Avg R²: ${avgScore.toFixed(4)}, StdDev: ${stdDev.toFixed(4)}`);
+      
+      // 更新最佳参数
+      if (avgScore > bestDtScore) {
+        bestDtScore = avgScore;
+        bestDtParams = { maxDepth: depth };
+      }
+    }
+
+    console.log(`\nBest Decision Tree Parameters: Max Depth = ${bestDtParams.maxDepth}`);
+    console.log(`Best Cross-Validation R²: ${bestDtScore.toFixed(4)}`);
+
+    // Fine Tune Random Forest
+    console.log("\nTuning Random Forest Model...");
+    const numTreesOptions = [10, 20, 30];
+    const rfMaxDepths = [2, 3, 4];
+    let bestRfParams = null;
+    let bestRfScore = -Infinity;
+
+    for (const numTrees of numTreesOptions) {
+      for (const depth of rfMaxDepths) {
+        // 由于随机森林计算较为耗时，使用3折交叉验证
+        const scores = crossValidate(
+          primaryModel.features, 
+          primaryModel.target, 
+          3, 
+          () => {
+            const model = new RandomForestRegressor(numTrees, depth);
+            return model;
+          }
+        );
+        
+        // 计算平均分数
+        const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+        const stdDev = Math.sqrt(
+          scores.reduce((sum, s) => sum + Math.pow(s - avgScore, 2), 0) / scores.length
+        );
+        
+        console.log(`  Trees: ${numTrees}, Max Depth: ${depth}, Avg R²: ${avgScore.toFixed(4)}, StdDev: ${stdDev.toFixed(4)}`);
+        
+        // 更新最佳参数
+        if (avgScore > bestRfScore) {
+          bestRfScore = avgScore;
+          bestRfParams = { numTrees, maxDepth: depth };
+        }
+      }
+    }
+
+    console.log(`\nBest Random Forest Parameters: Trees = ${bestRfParams.numTrees}, Max Depth = ${bestRfParams.maxDepth}`);
+    console.log(`Best Cross-Validation R²: ${bestRfScore.toFixed(4)}`);
 
     /*-------------------------------------------------
       MODEL 1: LINEAR REGRESSION ANALYSIS 
@@ -158,12 +232,13 @@ async function main() {
     console.log("- Negative weights indicate features that decrease adoption intention");
     console.log("- R² values measure the proportion of variance explained by the model");
     
-    /*-------------------------------------------------
-      MODEL 2: DECISION TREE ANALYSIS 
-    -------------------------------------------------*/
+    // /*-------------------------------------------------
+    //   MODEL 2: DECISION TREE ANALYSIS 
+    // -------------------------------------------------*/
+
     console.log("\n----- DECISION TREE MODEL -----");
-    // Train and evaluate the decision tree model
-    const dt = new DecisionTreeRegressor(3);  // Max depth of 3
+    // 使用最佳参数训练决策树模型
+    const dt = new DecisionTreeRegressor(bestDtParams.maxDepth);
     dt.train(primarySplit.trainFeatures, primarySplit.trainTarget);
     
     const dtTrainScore = dt.score(primarySplit.trainFeatures, primarySplit.trainTarget);
@@ -183,8 +258,8 @@ async function main() {
       MODEL 3: RANDOM FOREST ANALYSIS
     -------------------------------------------------*/
     console.log("\n----- RANDOM FOREST MODEL -----");
-    // Train and evaluate the random forest model
-    const rf = new RandomForestRegressor(30, 3);  // 30 trees, max depth of 3
+    // use best parameter for train 
+    const rf = new RandomForestRegressor(bestRfParams.numTrees, bestRfParams.maxDepth);
     rf.train(primarySplit.trainFeatures, primarySplit.trainTarget);
     
     const rfTrainScore = rf.score(primarySplit.trainFeatures, primarySplit.trainTarget);
@@ -237,7 +312,7 @@ async function main() {
     
     // 2. Comprehensive Decision Tree Model
     console.log("\n2. Comprehensive Decision Tree Model:");
-    const dtCombined = new DecisionTreeRegressor(3);
+    const dtCombined = new DecisionTreeRegressor(bestDtParams.maxDepth);
     dtCombined.train(combinedSplit.trainFeatures, combinedSplit.trainTarget);
     
     const dtCombinedTrainScore = dtCombined.score(combinedSplit.trainFeatures, combinedSplit.trainTarget);
@@ -248,7 +323,7 @@ async function main() {
     
     // 3. Comprehensive Random Forest Model
     console.log("\n3. Comprehensive Random Forest Model:");
-    const rfCombined = new RandomForestRegressor(30, 3);
+    const rfCombined = new RandomForestRegressor(bestRfParams.numTrees, bestRfParams.maxDepth);
     rfCombined.train(combinedSplit.trainFeatures, combinedSplit.trainTarget);
     
     const rfCombinedTrainScore = rfCombined.score(combinedSplit.trainFeatures, combinedSplit.trainTarget);
@@ -265,103 +340,115 @@ async function main() {
     });
     
     /*-------------------------------------------------
-      NON-LINEAR RELATIONSHIP ANALYSIS
+     FEATURE INTERACTION ANALYSIS
     -------------------------------------------------*/
-    console.log("\n----- NON-LINEAR RELATIONSHIP ANALYSIS -----");
-    
-    // Sample prediction comparison
-    const sampleIndices = [0, 1, 2, 3, 4]; // First 5 test samples
-    
-    console.log("Sample Prediction Comparison (Linear Regression vs Decision Tree vs Random Forest):");
-    sampleIndices.forEach(i => {
-      const features = combinedSplit.testFeatures[i];
-      const actual = combinedSplit.testTarget[i];
-      const lrPredicted = lrCombined.predict(features);
-      const dtPredicted = dtCombined.predictSingle(features);
-      const rfPredicted = rfCombined.predictSingle(features);
+
+    // 特征交互分析
+    function improvedFeatureInteractionAnalysis(rfModel, features, testFeatures, testTarget) {
+      console.log("\n----- FEATURE INTERACTION ANALYSIS -----");
       
-      console.log(`\nSample ${i+1}:`);
-      console.log(`  Actual value: ${actual.toFixed(2)}`);
-      console.log(`  Linear Regression prediction: ${lrPredicted.toFixed(2)}, error: ${Math.abs(actual - lrPredicted).toFixed(2)}`);
-      console.log(`  Decision Tree prediction: ${dtPredicted.toFixed(2)}, error: ${Math.abs(actual - dtPredicted).toFixed(2)}`);
-      console.log(`  Random Forest prediction: ${rfPredicted.toFixed(2)}, error: ${Math.abs(actual - rfPredicted).toFixed(2)}`);
-      
-      // Analyze which model performs best on this sample
-      const lrError = Math.abs(actual - lrPredicted);
-      const dtError = Math.abs(actual - dtPredicted);
-      const rfError = Math.abs(actual - rfPredicted);
-      
-      let bestModel = "Linear Regression";
-      let lowestError = lrError;
-      
-      if (dtError < lrError && dtError < rfError) {
-        bestModel = "Decision Tree";
-        lowestError = dtError;
-      } else if (rfError < lrError && rfError < dtError) {
-        bestModel = "Random Forest";
-        lowestError = rfError;
+      // 创建特征对
+      const featurePairs = [];
+      for (let i = 0; i < features.length; i++) {
+        for (let j = i+1; j < features.length; j++) {
+          featurePairs.push([i, j]);
+        }
       }
       
-      console.log(`  ${bestModel} performs best on this sample (error: ${lowestError.toFixed(2)})`);
+      console.log("Potential Feature Interactions:");
       
-      // Print feature values
-      console.log("  Feature values:");
-      combinedFeatures.forEach((feature, j) => {
-        console.log(`    ${feature}: ${features[j].toFixed(2)}`);
+      // 分析前5个交互
+      featurePairs.slice(0, 27).forEach(pair => {
+        const [i, j] = pair;
+        
+        console.log(`\n${features[i]} and ${features[j]} interaction:`);
+        
+        // 创建基准样本
+        const baselineSample = Array(features.length).fill(3); // 中等值
+        
+        // 创建四种组合的样本
+        const lowLowSample = [...baselineSample];
+        lowLowSample[i] = 1.5; // 低值
+        lowLowSample[j] = 1.5; // 低值
+        
+        const highHighSample = [...baselineSample];
+        highHighSample[i] = 4.5; // 高值
+        highHighSample[j] = 4.5; // 高值
+        
+        // 使用随机森林预测这些样本
+        const lowLowPred = rfModel.predictSingle(lowLowSample);
+        const highHighPred = rfModel.predictSingle(highHighSample);
+        
+        // 根据真实预测分析交互
+        console.log(`  - When both features are low, prediction = ${lowLowPred.toFixed(2)}`);
+        console.log(`  - When both features are high, prediction = ${highHighPred.toFixed(2)}`);
+        
+        // 计算差异来确定交互存在与否
+        const difference = highHighPred - lowLowPred;
+        const interactionExists = Math.abs(difference) > 0.5;
+        
+        console.log(`  - This suggests a significant interaction between these features ${interactionExists ? 'exists' : 'does not exist'}`);
       });
-    });
-    
-    // Feature interaction analysis
-    console.log("\n----- FEATURE INTERACTION ANALYSIS -----");
-    
-    // Detect potential interactions between feature pairs
-    const featurePairs = [];
-    for (let i = 0; i < combinedFeatures.length; i++) {
-      for (let j = i+1; j < combinedFeatures.length; j++) {
-        featurePairs.push([i, j]);
-      }
     }
+
+     /*-------------------------------------------------
+     Threshold Analysis ANALYSIS
+    -------------------------------------------------*/
+
+    // 阈值效应分析
+    function improvedThresholdAnalysis(rfModel, features, testFeatures, testTarget) {
+      console.log("\nThreshold Effect Analysis:");
+      
+      // 分析前3个特征
+      features.slice(0, 27).forEach((feature, idx) => {
+        console.log(`\n${feature} threshold effects:`);
+        
+        // 创建基准样本
+        const baselineSample = Array(features.length).fill(3);
+        
+        // 测试不同阈值
+        const thresholds = [1.5, 2.5, 3.5, 4.5];
+        const predictions = [];
+        
+        // 使用模型预测不同阈值下的结果
+        thresholds.forEach(threshold => {
+          const testSample = [...baselineSample];
+          testSample[idx] = threshold;
+          const prediction = rfModel.predictSingle(testSample);
+          predictions.push({ threshold, prediction });
+        });
+        
+        // 分析预测趋势，查找可能的阈值点
+        let hasThreshold = false;
+        for (let i = 1; i < predictions.length; i++) {
+          const change = predictions[i].prediction - predictions[i-1].prediction;
+          if (Math.abs(change) > 0.5) {
+            hasThreshold = true;
+            console.log(`  - Significant change detected at threshold ${predictions[i-1].threshold}`);
+          }
+        }
+        
+        // 输出低值和高值的预测
+        console.log(`  - When ${feature} < 2.5, predictions tend to ${predictions[0].prediction < predictions[1].prediction ? 'decrease' : 'increase'}`);
+        console.log(`  - When ${feature} > 3.5, predictions tend to ${predictions[2].prediction < predictions[3].prediction ? 'decrease' : 'increase'}`);
+        console.log(`  - This suggests that a threshold effect for ${feature} ${hasThreshold ? 'might exist' : 'might not exist'}`);
+      });
+    }
+
+    improvedFeatureInteractionAnalysis(
+      rfCombined,
+      combinedFeatures,
+      combinedSplit.testFeatures,
+      combinedSplit.testTarget
+    );
     
-    console.log("Potential Feature Interactions:");
-    
-    // Analyze only the first 5 potential interactions to avoid excessive output
-    featurePairs.slice(0, 5).forEach(pair => {
-      const [i, j] = pair;
-      
-      console.log(`\n${combinedFeatures[i]} and ${combinedFeatures[j]} interaction:`);
-      
-      // Calculate feature value products for each sample (a simple way to detect interactions)
-      const interactions = combinedSplit.testFeatures.map(sample => sample[i] * sample[j]);
-      
-      // Analyze how these interactions might affect predictions
-      console.log(`  - When both features are high, predictions tend to ${interactions.some(val => val > 16) ? 'increase' : 'be uncertain'}`);
-      console.log(`  - When both features are low, predictions tend to ${interactions.some(val => val < 4) ? 'decrease' : 'be uncertain'}`);
-      
-      // Determine if there's a significant interaction based on random forest performance
-      const interactionStrength = Math.random() > 0.5 ? 'exists' : 'does not exist'; // Simplified for demonstration
-      console.log(`  - This suggests a significant interaction between these features ${interactionStrength}`);
-    });
-    
-    // Threshold effect analysis
-    console.log("\nThreshold Effect Analysis:");
-    combinedFeatures.slice(0, 3).forEach((feature, idx) => {
-      console.log(`\n${feature} threshold effects:`);
-      
-      // Simple analysis of feature influence in different value ranges
-      const lowValues = combinedSplit.testFeatures.filter(sample => sample[idx] < 2.5);
-      const highValues = combinedSplit.testFeatures.filter(sample => sample[idx] > 3.5);
-      
-      // Determine effect direction based on observed patterns (simplified for demonstration)
-      const lowEffect = lowValues.length > 0 ? (Math.random() > 0.5 ? 'increase' : 'decrease') : 'insufficient data';
-      const highEffect = highValues.length > 0 ? (Math.random() > 0.5 ? 'increase' : 'decrease') : 'insufficient data';
-      
-      console.log(`  - When ${feature} < 2.5, predictions tend to ${lowEffect}`);
-      console.log(`  - When ${feature} > 3.5, predictions tend to ${highEffect}`);
-      
-      // Determine if a threshold effect exists (simplified for demonstration)
-      const thresholdExists = Math.random() > 0.5 ? 'might exist' : 'might not exist';
-      console.log(`  - This suggests that a threshold effect for ${feature} ${thresholdExists}`);
-    });
+    // 3. 阈值效应分析 (使用改进的函数)
+    improvedThresholdAnalysis(
+      rfCombined,
+      combinedFeatures,
+      combinedSplit.testFeatures,
+      combinedSplit.testTarget
+    );
     
     /*-------------------------------------------------
       MODEL PERFORMANCE COMPARISON
