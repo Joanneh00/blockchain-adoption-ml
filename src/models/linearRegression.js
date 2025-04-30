@@ -75,6 +75,13 @@ class LinearRegression {
       
       return absWeights.map(w => (w / totalWeight) * 100);
     }
+
+    // 添加到LinearRegression类中
+    predictBatch(features) {
+      return features.map(x => this.predict(x));
+    }
   }
+
+
   
   module.exports = LinearRegression;

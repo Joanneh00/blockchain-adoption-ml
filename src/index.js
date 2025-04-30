@@ -41,7 +41,7 @@ async function main() {
     console.log(`Training set size: ${primarySplit.trainFeatures.length}`);
     console.log(`Test set size: ${primarySplit.testFeatures.length}`);
     
-        /*-------------------------------------------------
+      /*-------------------------------------------------
       MODEL TUNING WITH CROSS VALIDATION
     -------------------------------------------------*/
     console.log("\n----- MODEL TUNING WITH CROSS VALIDATION -----");
@@ -461,12 +461,81 @@ async function main() {
     console.log("Comprehensive Decision Tree (8 features) - Test R²:", dtCombinedTestScore.toFixed(4));
     console.log("Comprehensive Random Forest (8 features) - Test R²:", rfCombinedTestScore.toFixed(4));
     
+    /*-----------------------------------------------
+    Culculate MSE
+    ------------------------------------------------*/
+    function calculateMSE(actual, predicted) {
+      if (!Array.isArray(actual) || !Array.isArray(predicted)) {
+        console.error('Input must be arrays');
+        console.log('Actual:', actual);
+        console.log('Predicted:', predicted);
+        throw new Error('Input must be arrays');
+      }
+      
+      if (actual.length !== predicted.length) {
+        console.error(`Arrays length mismatch: actual ${actual.length}, predicted ${predicted.length}`);
+        // 你可以选择使用较短的长度来避免错误
+        const minLength = Math.min(actual.length, predicted.length);
+        actual = actual.slice(0, minLength);
+        predicted = predicted.slice(0, minLength);
+        console.warn(`Using first ${minLength} elements of each array instead`);
+      }
+      
+      let sumSquaredError = 0;
+      for (let i = 0; i < actual.length; i++) {
+        sumSquaredError += Math.pow(actual[i] - predicted[i], 2);
+      }
+      
+      return sumSquaredError / actual.length;
+    }
+    
+    /*-----------------------------------------------
+    Culculate RMSE
+    ------------------------------------------------*/
+    function calculateRMSE(actual, predicted) {
+      return Math.sqrt(calculateMSE(actual, predicted));
+    }
+
+    /*-----------------------------------------------
+    Culculate MSE & RMSE for LR, DT, RF
+    ------------------------------------------------*/
+    const lrPredictions = lr.predictBatch(primarySplit.testFeatures);
+    const lrTestMSE = calculateMSE(primarySplit.testTarget, lrPredictions);
+    const lrTestRMSE = calculateRMSE(primarySplit.testTarget, lrPredictions);
+
+    console.log(`\nLinear Regression Test MSE: ${lrTestMSE.toFixed(4)}`);
+    console.log(`Linear Regression Test RMSE: ${lrTestRMSE.toFixed(4)}`);
+
+    DecisionTreeRegressor.prototype.predictBatch = function(features) {
+      return features.map(x => this.predictSingle(x));
+    };
+
+    RandomForestRegressor.prototype.predictBatch = function(features) {
+      return features.map(x => this.predictSingle(x));
+    };
+
+    // 决策树模型的MSE和RMSE
+    const dtPredictions = dt.predictBatch(primarySplit.testFeatures);
+    const dtTestMSE = calculateMSE(primarySplit.testTarget, dtPredictions);
+    const dtTestRMSE = calculateRMSE(primarySplit.testTarget, dtPredictions);
+    console.log(`\nDecision Tree Test MSE: ${dtTestMSE.toFixed(4)}`);
+    console.log(`Decision Tree Test RMSE: ${dtTestRMSE.toFixed(4)}`);
+
+    // 随机森林模型的MSE和RMSE
+    const rfPredictions = rf.predictBatch(primarySplit.testFeatures);
+    const rfTestMSE = calculateMSE(primarySplit.testTarget, rfPredictions);
+    const rfTestRMSE = calculateRMSE(primarySplit.testTarget, rfPredictions);
+    console.log(`\nRandom Forest Test MSE: ${rfTestMSE.toFixed(4)}`);
+    console.log(`Random Forest Test RMSE: ${rfTestRMSE.toFixed(4)}`);
+
     // Visualization guidance
     console.log("\nVisualization Recommendations:");
     console.log("1. Bar chart for feature importance comparison across models");
     console.log("2. Scatter plot of actual vs. predicted values for each model");
     console.log("3. Heatmap for feature interactions");
     console.log("4. Line charts for threshold effects");
+
+
     
     /*-------------------------------------------------
       CONCLUSIONS
