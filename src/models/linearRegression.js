@@ -11,7 +11,7 @@ class LinearRegression {
       this.bias = null;
     }
     
-    train(features, target, learningRate = 0.01, iterations = 1000) {
+    train(features, target, learningRate = 0.001, iterations = 1000) {
       const n = features.length;
       const numFeatures = features[0].length;
       
